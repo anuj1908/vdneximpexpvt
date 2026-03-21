@@ -9,7 +9,7 @@ import {
 
 // --- ASSETS & DATA ---
 // IMPORTANT: For your local Vite project, uncomment the line below to use your actual logo file:
-const LOGO_SRC = './src/assets/logo.png'; 
+const LOGO_SRC = './logo.png'; 
 // (We are using a placeholder URL here so the live preview compiles successfully)
 //const LOGO_SRC = "https://placehold.co/400x150/ffffff/1e3a8a?font=montserrat&text=VDNEX+IMPEX"; 
 
