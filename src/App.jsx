@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // --- ASSETS & DATA ---
-const LOGO_SRC = "./src/assets/logo.png"; 
+const LOGO_SRC = "./logo.png"; 
 
 const services = [
   { id: 1, title: 'Air Freight', icon: Plane, desc: 'Fast and reliable global air freight services ensuring your cargo arrives on time.', img: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=70&w=600', details: 'Air freight is the fastest and most reliable way to ship goods globally. At VDNEX, we partner with major airlines to provide priority, standard, and deferred air freight solutions. Whether you are shipping perishable goods, high-value electronics, or urgent documents, our dedicated air freight team ensures swift customs clearance and door-to-door delivery.' },
