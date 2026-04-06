@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mail, Phone, MapPin, ChevronRight, Menu, X, 
   Globe, Truck, Ship, Plane, Box, ShieldCheck, 
   ChevronDown, Facebook, Twitter, Linkedin, Instagram, 
   ArrowRight, Upload, Send, CheckCircle2,
-  DollarSign, Cloud, Wind, TrendingUp, Check
+  DollarSign, Cloud, Wind, TrendingUp, Check, Search,
+  Target, Eye, Award, Users
 } from 'lucide-react';
 
 // --- ASSETS & DATA ---
-// IMPORTANT: For your local Vite project, uncomment the line below to use your actual logo file:
-const LOGO_SRC = './logo.png'; 
-// (We are using a placeholder URL here so the live preview compiles successfully)
-//const LOGO_SRC = "https://placehold.co/400x150/ffffff/1e3a8a?font=montserrat&text=VDNEX+IMPEX"; 
+const LOGO_SRC = "./src/assets/logo.png"; 
 
-// OPTIMIZATION: Reduced width from 800 to 600 and quality from 80 to 70 for faster card loading
 const services = [
   { id: 1, title: 'Air Freight', icon: Plane, desc: 'Fast and reliable global air freight services ensuring your cargo arrives on time.', img: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=70&w=600', details: 'Air freight is the fastest and most reliable way to ship goods globally. At VDNEX, we partner with major airlines to provide priority, standard, and deferred air freight solutions. Whether you are shipping perishable goods, high-value electronics, or urgent documents, our dedicated air freight team ensures swift customs clearance and door-to-door delivery.' },
   { id: 2, title: 'Ocean Freight', icon: Ship, desc: 'Cost-effective sea cargo solutions globally tailored for both FCL and LCL shipments.', img: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=70&w=600', details: 'Ocean freight is the backbone of global trade. We offer comprehensive Full Container Load (FCL) and Less than Container Load (LCL) services worldwide. Our deep relationships with top ocean carriers allow us to secure competitive rates and flexible sailing schedules, ensuring your bulk shipments and large-scale cargo are handled with the utmost efficiency.' },
@@ -30,17 +27,131 @@ const sliderData = [
   { title: "Efficiency through technology", img: "https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=70&w=1600" }
 ];
 
+// Dictionary mapping major trading countries to their key sea and air ports.
+const PORTS_BY_COUNTRY = {
+  "China": ["Port of Shanghai", "Port of Shenzhen", "Port of Ningbo-Zhoushan", "Port of Guangzhou", "Port of Qingdao", "Port of Tianjin", "Hong Kong International (HKG)", "Shanghai Pudong (PVG)"],
+  "United States": ["Port of Los Angeles", "Port of Long Beach", "Port of New York & New Jersey", "Port of Savannah", "Port of Houston", "Memphis International (MEM)", "Los Angeles Int (LAX)", "JFK International (JFK)"],
+  "India": ["Jawaharlal Nehru Port (Nhava Sheva)", "Mundra Port", "Chennai Port", "Kolkata Port", "Mumbai Port", "Cochin Port", "Delhi Airport (DEL)", "Mumbai Airport (BOM)", "Chennai Airport (MAA)"],
+  "United Arab Emirates": ["Port of Jebel Ali (Dubai)", "Khalifa Port (Abu Dhabi)", "Dubai International Airport (DXB)"],
+  "Singapore": ["Port of Singapore", "Changi Airport (SIN)"],
+  "Germany": ["Port of Hamburg", "Port of Bremen", "Frankfurt Airport (FRA)", "Leipzig/Halle Airport (LEJ)"],
+  "United Kingdom": ["Port of Felixstowe", "Port of Southampton", "Port of London", "London Heathrow (LHR)"],
+  "Netherlands": ["Port of Rotterdam", "Port of Amsterdam", "Amsterdam Schiphol (AMS)"],
+  "South Korea": ["Port of Busan", "Port of Incheon", "Incheon Int Airport (ICN)"],
+  "Japan": ["Port of Tokyo", "Port of Yokohama", "Port of Kobe", "Port of Osaka", "Narita Int Airport (NRT)", "Haneda Airport (HND)"],
+  "Australia": ["Port of Melbourne", "Port of Sydney", "Port of Brisbane", "Sydney Airport (SYD)"],
+  "Malaysia": ["Port Klang", "Port of Tanjung Pelepas", "Kuala Lumpur Int (KUL)"],
+  "Vietnam": ["Ho Chi Minh City Port", "Hai Phong Port", "Da Nang Port", "Noi Bai Int (HAN)", "Tan Son Nhat (SGN)"],
+  "Canada": ["Port of Vancouver", "Port of Montreal", "Toronto Pearson (YYZ)"],
+  "France": ["Port of Le Havre", "Port of Marseille", "Paris Charles de Gaulle (CDG)"]
+};
+
+// Constant array for Indian States to avoid CORS API Fetch Failures
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", 
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh", 
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Lakshadweep", "Puducherry"
+];
+
 // --- EXTERNAL COMPONENTS ---
+
+// Smart Autocomplete Input - Prevents browser crashes by only rendering matching results
+const SmartPortAutocomplete = ({ country, value, onChange, placeholder }) => {
+  const [query, setQuery] = useState(value || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const wrapperRef = useRef(null);
+
+  // Sync internal query state if parent value changes
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
+  // Click outside listener to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Logic to filter ports without overloading DOM
+  useEffect(() => {
+    const availablePorts = PORTS_BY_COUNTRY[country] || [];
+    
+    if (query.length > 0) {
+      const filtered = availablePorts.filter(p => p.toLowerCase().includes(query.toLowerCase()));
+      // Limit to 10 suggestions to ensure browser never crashes, even with huge datasets
+      setSuggestions(filtered.slice(0, 10));
+    } else {
+      // If empty, show top 5 ports for that country as default suggestions
+      setSuggestions(availablePorts.slice(0, 5));
+    }
+  }, [query, country]);
+
+  const handleSelect = (selectedPort) => {
+    setQuery(selectedPort);
+    onChange(selectedPort);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative">
+        <input 
+          type="text" 
+          value={query}
+          onChange={(e) => { 
+            setQuery(e.target.value); 
+            onChange(e.target.value); // Pass exact typed value to parent (allows custom ports!)
+            setShowSuggestions(true); 
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          placeholder={placeholder}
+          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base pr-10"
+          required
+        />
+        <Search className="absolute right-3 top-3.5 text-slate-400" size={18} />
+      </div>
+      
+      {/* Dropdown Suggestions */}
+      {showSuggestions && suggestions.length > 0 && (
+        <ul className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-2xl max-h-60 overflow-y-auto custom-scrollbar">
+          <li className="px-3 py-1.5 bg-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider sticky top-0">
+            Suggested Ports for {country}
+          </li>
+          {suggestions.map((s, i) => (
+            <li 
+              key={i} 
+              className="px-4 py-2.5 hover:bg-orange-50 cursor-pointer text-sm text-slate-700 border-b border-slate-50 last:border-0 flex items-center justify-between"
+              onClick={() => handleSelect(s)}
+            >
+              {s} <ChevronRight size={14} className="text-orange-300"/>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 const LiveTicker = () => {
   const [rates, setRates] = useState(null);
   const [weather, setWeather] = useState([]);
 
   useEffect(() => {
+    // Add Fallbacks in case APIs block the preview environment (CORS)
     fetch('https://api.frankfurter.app/latest?from=USD&to=INR,EUR,GBP')
       .then(res => res.json())
       .then(data => setRates(data.rates))
-      .catch(err => console.error(err));
+      .catch(() => {
+        setRates({ INR: 83.15, EUR: 0.92, GBP: 0.79 }); // Fallback data
+      });
 
     const fetchWeather = async () => {
       const hubs = [
@@ -55,7 +166,13 @@ const LiveTicker = () => {
           return { name: hub.name, temp: data.current_weather.temperature, wind: data.current_weather.windspeed };
         }));
         setWeather(weatherData);
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        setWeather([
+          { name: 'Mumbai Port', temp: 31, wind: 14 },
+          { name: 'Dubai Port', temp: 36, wind: 18 },
+          { name: 'Singapore Port', temp: 29, wind: 10 }
+        ]); // Fallback data
+      }
     };
     fetchWeather();
   }, []);
@@ -134,7 +251,6 @@ const HomeView = ({ navigateTo }) => {
 
   return (
     <>
-      {/* --- HERO SLIDER WITH GLASSMORPHIC OVERLAY --- */}
       <div className="relative h-[85vh] md:h-[90vh] w-full overflow-hidden bg-slate-950">
         {sliderData.map((slide, index) => (
           <div key={`bg-${index}`} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
@@ -168,7 +284,6 @@ const HomeView = ({ navigateTo }) => {
         </div>
       </div>
 
-      {/* --- HOME ABOUT --- */}
       <section className="py-16 md:py-24 px-4 md:px-12 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 md:gap-16">
            <div className="lg:w-1/2 flex gap-8 animate-on-scroll slide-in-left">
@@ -227,7 +342,6 @@ const HomeView = ({ navigateTo }) => {
         </div>
       </section>
 
-      {/* --- HOME SERVICES PREVIEW --- */}
       <section className="py-16 md:py-24 px-4 md:px-12 bg-slate-50">
          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-12 md:mb-16 animate-on-scroll">
@@ -267,42 +381,169 @@ const HomeView = ({ navigateTo }) => {
 };
 
 const AboutView = ({ navigateTo }) => (
-  <div className="bg-slate-50 min-h-screen">
-    <div className="relative py-20 md:py-24 bg-blue-950 text-center" style={{backgroundImage: 'url("https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=80")', backgroundSize: 'cover', backgroundPosition: 'center'}}>
-      <div className="absolute inset-0 bg-blue-950/90"></div>
-      <div className="relative z-10 animate-fade-in-up px-4">
-        <h1 className="text-3xl md:text-5xl font-black text-white mb-4">About Us</h1>
-        <p className="text-orange-500 font-bold uppercase tracking-widest text-xs md:text-sm"><span className="text-slate-300 cursor-pointer hover:text-white" onClick={() => navigateTo('home')}>Home</span> / About</p>
+  <div className="bg-slate-50 min-h-screen pb-16">
+    {/* HERO SECTION */}
+    <div className="relative py-24 md:py-32 bg-blue-950 text-center overflow-hidden">
+      <div className="absolute inset-0">
+        <img src="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=80" alt="About Hero" className="w-full h-full object-cover opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-950/80 to-blue-950"></div>
+      </div>
+      <div className="relative z-10 animate-fade-in-up px-4 max-w-4xl mx-auto">
+        <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">Driving Global Trade Forward</h1>
+        <p className="text-blue-100 text-base md:text-xl mb-8 leading-relaxed font-light">
+          We are more than just a logistics company. We are your strategic partners in navigating the complexities of international and domestic supply chains.
+        </p>
+        <p className="text-orange-500 font-bold uppercase tracking-widest text-xs md:text-sm bg-blue-950/50 inline-block px-6 py-2 rounded-full backdrop-blur-sm border border-orange-500/30">
+          <span className="text-slate-300 cursor-pointer hover:text-white transition-colors" onClick={() => navigateTo('home')}>Home</span> / About Us
+        </p>
       </div>
     </div>
     
-    <section className="py-16 md:py-20 px-4 md:px-12 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row gap-12 md:gap-16 animate-on-scroll">
-        <div className="lg:w-1/2">
-          <img src="https://images.unsplash.com/photo-1565891741441-64926e441838?auto=format&fit=crop&q=80&w=1000" alt="About VDNEX" loading="lazy" className="rounded-2xl shadow-2xl w-full h-[300px] md:h-[500px] object-cover"/>
+    {/* OUR STORY SECTION */}
+    <section className="py-16 md:py-24 px-4 md:px-12 max-w-7xl mx-auto">
+      <div className="flex flex-col lg:flex-row gap-12 md:gap-16 items-center animate-on-scroll">
+        <div className="lg:w-1/2 relative group">
+          <div className="absolute inset-0 bg-orange-500 rounded-2xl transform translate-x-4 translate-y-4 group-hover:translate-x-2 group-hover:translate-y-2 transition-transform duration-500"></div>
+          <img src="https://images.unsplash.com/photo-1586528116311-ad8ed7c50adf?auto=format&fit=crop&q=80&w=1000" alt="VDNEX Operations" loading="lazy" className="relative rounded-2xl shadow-xl w-full h-[400px] md:h-[500px] object-cover z-10 group-hover:-translate-y-2 transition-transform duration-500"/>
+          
+          {/* Floating Badge */}
+          <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl shadow-2xl z-20 animate-fade-in-up delay-300 hidden md:block border-b-4 border-blue-950">
+            <div className="flex items-center gap-4">
+              <div className="bg-orange-100 p-3 rounded-full text-orange-500">
+                <Globe size={32} />
+              </div>
+              <div>
+                <h4 className="font-black text-blue-950 text-2xl">Global</h4>
+                <p className="text-slate-500 text-sm font-semibold uppercase tracking-wider">Reach & Network</p>
+              </div>
+            </div>
+          </div>
         </div>
+
         <div className="lg:w-1/2 flex flex-col justify-center">
           <h3 className="text-orange-500 font-bold mb-3 uppercase tracking-[0.2em] flex items-center gap-2 text-sm md:text-base">
-            <span className="w-8 h-0.5 bg-orange-500"></span> Overview
+            <span className="w-8 h-0.5 bg-orange-500"></span> Our Story
           </h3>
-          <h2 className="text-2xl md:text-4xl font-extrabold text-blue-950 mb-6 leading-tight">A Legacy of Global Logistics Excellence</h2>
-          <p className="text-slate-600 mb-4 leading-relaxed text-sm md:text-base">
-            Based in Vasai, Maharashtra, VDNEX IMPEX & SERVICES PVT LTD was founded with a clear vision: to redefine logistics by providing integrated freight forwarding and supply chain management services across the globe. The company is proudly led by its visionary partners, <strong className="text-blue-950">Vishal Chavan</strong> and <strong className="text-blue-950">CA Paresh Tiwari</strong>.
+          <h2 className="text-3xl md:text-4xl font-extrabold text-blue-950 mb-6 leading-tight">A Legacy of Logistics Excellence based in Vasai</h2>
+          <p className="text-slate-600 mb-5 leading-relaxed text-base">
+            Headquartered in the bustling industrial hub of Vasai, Maharashtra, <strong className="text-blue-950">VDNEX IMPEX & SERVICES PVT LTD</strong> was founded with a clear and unwavering vision: to redefine the standards of logistics by providing highly integrated, reliable, and transparent supply chain management services.
           </p>
-          <p className="text-slate-600 mb-8 leading-relaxed text-sm md:text-base">
-            Our expertise spans every mode of transport — air, sea, and road — ensuring that your cargo reaches its destination efficiently and safely. We combine experience, cutting-edge technology, and an unwavering customer focus to provide solutions that go beyond simple transportation.
+          <p className="text-slate-600 mb-8 leading-relaxed text-base">
+            Our expertise spans across every critical mode of transport — Air, Sea, and Road. Whether it is complex customs broking, massive 3PL warehousing, or cross-border freight forwarding, we combine years of industry experience with cutting-edge technology. We ensure that your cargo reaches its destination efficiently, safely, and exactly on time, turning your logistics into a competitive advantage.
           </p>
-          <div className="bg-white p-5 md:p-6 rounded-xl shadow-lg border-l-4 border-orange-500">
-            <h4 className="text-lg md:text-xl font-bold text-blue-950 mb-2">Our Mission</h4>
-            <p className="text-slate-600 text-xs md:text-sm">To be among the most trusted global logistics providers, recognized for operational excellence, innovation, and absolute customer satisfaction.</p>
-          </div>
-          <div className="bg-white p-5 md:p-6 rounded-xl shadow-lg border-l-4 border-blue-950 mt-4">
-            <h4 className="text-lg md:text-xl font-bold text-blue-950 mb-2">Our Vision</h4>
-            <p className="text-slate-600 text-xs md:text-sm">To deliver world-class logistics solutions driven by technology, reliability, transparency, and sustainable operational practices.</p>
+          
+          <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="text-orange-500 shrink-0 mt-1" size={20}/>
+              <div>
+                <h4 className="font-bold text-blue-950 text-sm md:text-base">Trusted Partners</h4>
+                <p className="text-xs text-slate-500 mt-1">100+ Global network nodes.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="text-orange-500 shrink-0 mt-1" size={20}/>
+              <div>
+                <h4 className="font-bold text-blue-950 text-sm md:text-base">End-to-End Care</h4>
+                <p className="text-xs text-slate-500 mt-1">Complete 3PL management.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
+
+    {/* MISSION & VISION SECTION */}
+    <section className="py-16 px-4 md:px-12 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-on-scroll">
+        
+        {/* Mission Card */}
+        <div className="bg-blue-950 p-8 md:p-12 rounded-2xl text-white transform hover:-translate-y-2 transition-all duration-300 shadow-xl group overflow-hidden relative">
+          <div className="absolute -right-10 -top-10 text-white/5 transform group-hover:scale-110 transition-transform duration-700">
+            <Target size={200} />
+          </div>
+          <div className="relative z-10">
+            <div className="bg-blue-900/50 w-16 h-16 rounded-xl flex items-center justify-center mb-8 border border-blue-800 group-hover:border-orange-500 transition-colors">
+              <Target size={32} className="text-orange-500" />
+            </div>
+            <h3 className="text-2xl md:text-3xl font-extrabold mb-4">Our Mission</h3>
+            <p className="text-blue-100 leading-relaxed text-sm md:text-base">
+              To be among the most trusted and preferred global logistics providers. We strive to be consistently recognized for our operational excellence, continuous innovation, and an absolute commitment to customer satisfaction. We aim to simplify global trade for businesses of all sizes.
+            </p>
+          </div>
+        </div>
+
+        {/* Vision Card */}
+        <div className="bg-orange-500 p-8 md:p-12 rounded-2xl text-white transform hover:-translate-y-2 transition-all duration-300 shadow-xl group overflow-hidden relative">
+          <div className="absolute -right-10 -top-10 text-white/10 transform group-hover:scale-110 transition-transform duration-700">
+            <Eye size={200} />
+          </div>
+          <div className="relative z-10">
+            <div className="bg-orange-600/50 w-16 h-16 rounded-xl flex items-center justify-center mb-8 border border-orange-400 group-hover:border-blue-950 transition-colors">
+              <Eye size={32} className="text-blue-950" />
+            </div>
+            <h3 className="text-2xl md:text-3xl font-extrabold mb-4 text-blue-950">Our Vision</h3>
+            <p className="text-orange-50 leading-relaxed text-sm md:text-base">
+              To deliver world-class logistics solutions driven by cutting-edge technology, steadfast reliability, and transparent communication. We envision a future where our sustainable operational practices not only drive business growth but also positively impact the global environment.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    {/* LEADERSHIP / FOUNDERS SECTION */}
+    <section className="py-16 md:py-24 px-4 md:px-12 mt-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16 animate-on-scroll">
+           <h3 className="text-orange-500 font-bold mb-3 uppercase tracking-[0.2em] flex items-center justify-center gap-2 text-sm md:text-base">
+              <span className="w-8 h-0.5 bg-orange-500"></span> Leadership <span className="w-8 h-0.5 bg-orange-500"></span>
+           </h3>
+           <h2 className="text-3xl md:text-5xl font-extrabold text-blue-950">Meet Our Founders</h2>
+           <p className="text-slate-600 mt-4 max-w-2xl mx-auto text-sm md:text-base">
+             The visionary minds behind VDNEX Impex & Services. Their combined expertise in global logistics and financial strategy drives our company forward.
+           </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20 max-w-5xl mx-auto">
+          
+          {/* Founder 1: Vishal Chavan */}
+          <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-shadow duration-300 border-t-4 border-blue-950 animate-on-scroll text-center group">
+            <div className="w-40 h-40 md:w-48 md:h-48 mx-auto mb-6 rounded-full overflow-hidden shadow-xl border-4 border-slate-50 group-hover:border-blue-950 transition-colors relative">
+              {/* Note: Placeholder image representing a professional businessman. Replace with actual photo. */}
+              <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400" alt="Vishal Chavan" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+            </div>
+            <h3 className="text-2xl md:text-3xl font-extrabold text-blue-950 mb-1">Vishal Chavan</h3>
+            <p className="text-orange-500 font-bold mb-5 uppercase tracking-wider text-xs md:text-sm">Partner & Co-Founder</p>
+            <p className="text-slate-600 text-sm md:text-base leading-relaxed">
+              With a profound understanding of international trade dynamics and supply chain operations, Vishal spearheads the strategic growth and global partnerships at VDNEX. His hands-on leadership ensures operational excellence, robust client relationships, and seamless cargo movements across borders.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+               <span className="bg-slate-100 p-2 rounded-md text-slate-400 hover:bg-blue-950 hover:text-white cursor-pointer transition-colors"><Linkedin size={18}/></span>
+               <span className="bg-slate-100 p-2 rounded-md text-slate-400 hover:bg-blue-950 hover:text-white cursor-pointer transition-colors"><Mail size={18}/></span>
+            </div>
+          </div>
+
+          {/* Founder 2: CA Paresh Tiwari */}
+          <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-shadow duration-300 border-t-4 border-orange-500 animate-on-scroll delay-100 text-center group">
+            <div className="w-40 h-40 md:w-48 md:h-48 mx-auto mb-6 rounded-full overflow-hidden shadow-xl border-4 border-slate-50 group-hover:border-orange-500 transition-colors relative">
+              {/* Note: Placeholder image representing a professional businessman. Replace with actual photo. */}
+              <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=400" alt="CA Paresh Tiwari" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+            </div>
+            <h3 className="text-2xl md:text-3xl font-extrabold text-blue-950 mb-1">CA Paresh Tiwari</h3>
+            <p className="text-orange-500 font-bold mb-5 uppercase tracking-wider text-xs md:text-sm">Partner & Co-Founder</p>
+            <p className="text-slate-600 text-sm md:text-base leading-relaxed">
+              Bringing extensive financial expertise and compliance acumen, CA Paresh Tiwari oversees the fiscal strategies and regulatory frameworks of VDNEX. His deep knowledge ensures that our customs broking, taxation strategies, and 3PL services are highly transparent, legally compliant, and financially optimized for our clients.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+               <span className="bg-slate-100 p-2 rounded-md text-slate-400 hover:bg-orange-500 hover:text-white cursor-pointer transition-colors"><Linkedin size={18}/></span>
+               <span className="bg-slate-100 p-2 rounded-md text-slate-400 hover:bg-orange-500 hover:text-white cursor-pointer transition-colors"><Mail size={18}/></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
   </div>
 );
 
@@ -330,7 +571,6 @@ const CareerView = ({ navigateTo }) => {
         setStatus('error');
       }
     } catch (error) {
-      console.error(error);
       setStatus('error');
     }
 
@@ -431,7 +671,39 @@ const CareerView = ({ navigateTo }) => {
 
 const ContactView = ({ navigateTo }) => {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
-  const [status, setStatus] = useState('idle'); // idle, submitting, success, error
+  const [status, setStatus] = useState('idle'); 
+
+  // Advanced Form States
+  const [serviceType, setServiceType] = useState('');
+  const [tradeType, setTradeType] = useState('');
+  const [mentorshipType, setMentorshipType] = useState('');
+  const [countries, setCountries] = useState([]);
+  const [states] = useState(INDIAN_STATES); // Using stable internal array
+  
+  // New Fully Decoupled Origin/Destination States
+  const [pickupState, setPickupState] = useState('');
+  const [deliveryState, setDeliveryState] = useState('');
+  
+  const [originCountry, setOriginCountry] = useState('');
+  const [originPort, setOriginPort] = useState('');
+  
+  const [destCountry, setDestCountry] = useState('');
+  const [destPort, setDestPort] = useState('');
+
+  // Fetch API Data for Global Countries
+  useEffect(() => {
+    // Fetch Global Countries (REST Countries API - Free)
+    fetch('https://restcountries.com/v3.1/all?fields=name')
+      .then(res => res.json())
+      .then(data => {
+        const sortedCountries = data.map(c => c.name.common).sort();
+        setCountries(sortedCountries);
+      })
+      .catch(() => {
+        // Fallback to dictionary keys if API is blocked by browser preview/CORS
+        setCountries(Object.keys(PORTS_BY_COUNTRY).sort());
+      });
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -441,7 +713,23 @@ const ContactView = ({ navigateTo }) => {
     e.preventDefault();
     setStatus('submitting');
     
-    // ADVANCED FRAMEWORK: Using FormSubmit.co to process background emails
+    let extendedMessage = `--- Service Requirements ---\nCategory: ${serviceType}\n`;
+    
+    if (serviceType === 'International') {
+      extendedMessage += `Trade Type: ${tradeType}\n`;
+      extendedMessage += `Origin (Pickup): ${originPort}, ${originCountry}\n`;
+      extendedMessage += `Destination (Delivery): ${destPort}, ${destCountry}\n`;
+    } else if (serviceType === 'Domestic') {
+      extendedMessage += `Trade Type: ${tradeType}\n`;
+      extendedMessage += `Pickup State: ${pickupState}\n`;
+      extendedMessage += `Delivery State: ${deliveryState}\n`;
+    } else if (serviceType === 'Mentorship') {
+      extendedMessage += `Mentorship Focus: ${mentorshipType}\n`;
+    }
+    
+    extendedMessage += `\n--- Client Message ---\n${formData.message}`;
+
+    // ADVANCED FRAMEWORK: Using FormSubmit.co
     const API_ENDPOINT = "https://formsubmit.co/ajax/vdneximpex@gmail.com";
 
     try {
@@ -454,24 +742,26 @@ const ContactView = ({ navigateTo }) => {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          _replyto: formData.email, // Allows you to reply directly to the customer
-          subject: `Website Query: ${formData.subject}`,
-          message: formData.message
+          _replyto: formData.email, 
+          subject: `Website Query: ${formData.subject} - [${serviceType}]`,
+          message: extendedMessage
         })
       });
 
       if (response.ok) {
         setStatus('success');
         setFormData({ name: '', email: '', subject: '', message: '' });
+        setServiceType(''); setTradeType(''); setMentorshipType('');
+        setOriginCountry(''); setOriginPort('');
+        setDestCountry(''); setDestPort('');
+        setPickupState(''); setDeliveryState(''); 
       } else {
         setStatus('error');
       }
     } catch (error) {
-      console.error("Form submission error:", error);
       setStatus('error');
     }
 
-    // Reset button status back to normal after 5 seconds
     setTimeout(() => setStatus('idle'), 5000);
   };
 
@@ -507,29 +797,168 @@ const ContactView = ({ navigateTo }) => {
         <div className="flex flex-col lg:flex-row gap-8 animate-on-scroll">
           <div className="lg:w-2/3 bg-white p-6 md:p-12 rounded-2xl shadow-xl">
             <h3 className="text-xl md:text-2xl font-bold text-blue-950 mb-6 flex items-center gap-3">
-              <Send className="text-orange-500"/> Get a Quote / Send Message
+              <Send className="text-orange-500"/> Submit a Detailed Query
             </h3>
             
-            {/* ADVANCED BACKGROUND CONTACT FORM */}
+            {/* ADVANCED DYNAMIC CONTACT FORM */}
             <form className="space-y-4 md:space-y-6" onSubmit={handleSubmit}>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Your Name</label>
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Your Name *</label>
                   <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" placeholder="John Doe" required/>
                 </div>
                 <div>
-                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Your Email</label>
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Your Email *</label>
                   <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" placeholder="john@example.com" required/>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Subject</label>
-                <input type="text" name="subject" value={formData.subject} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" placeholder="Requesting a quote for Ocean Freight" required/>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div>
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Subject *</label>
+                  <input type="text" name="subject" value={formData.subject} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" placeholder="E.g. Requesting a quote" required/>
+                </div>
+                <div>
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Service Category *</label>
+                  <select 
+                    value={serviceType} 
+                    onChange={(e) => { 
+                      setServiceType(e.target.value); 
+                      setTradeType(''); setMentorshipType(''); 
+                      setOriginCountry(''); setOriginPort('');
+                      setDestCountry(''); setDestPort('');
+                      setPickupState(''); setDeliveryState('');
+                    }} 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                    <option value="" disabled>Select a Service</option>
+                    <option value="International">International Shipping</option>
+                    <option value="Domestic">Domestic Shipping</option>
+                    <option value="Mentorship">Mentorship Program</option>
+                  </select>
+                </div>
               </div>
+
+              {/* DYNAMIC FIELDS: International OR Domestic */}
+              {(serviceType === 'International' || serviceType === 'Domestic') && (
+                <div className="grid grid-cols-1 gap-4 bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                  
+                  {/* Trade Type Selection */}
+                  <div>
+                    <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Trade Type *</label>
+                    <select value={tradeType} onChange={(e) => setTradeType(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                      <option value="" disabled>Select Trade Type</option>
+                      <option value="Export">Export / Outbound</option>
+                      <option value="Import">Import / Inbound</option>
+                      <option value="Cross-Trade">Cross-Trade</option>
+                    </select>
+                  </div>
+                  
+                  {/* International Origin & Destination (Fully Flexible) */}
+                  {serviceType === 'International' && (
+                     <>
+                       {/* Origin Block */}
+                       <div className="border-l-4 border-orange-500 pl-4 py-2">
+                         <h4 className="font-bold text-blue-950 mb-3">Origin (Pickup Location)</h4>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Origin Country *</label>
+                             <select value={originCountry} onChange={(e) => {
+                                 setOriginCountry(e.target.value);
+                                 setOriginPort('');
+                               }} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                               <option value="" disabled>Select Country</option>
+                               {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                             </select>
+                           </div>
+                           
+                           {originCountry && (
+                             <div className="animate-fade-in-up">
+                               <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Origin Port Name *</label>
+                               <SmartPortAutocomplete 
+                                 country={originCountry} 
+                                 value={originPort} 
+                                 onChange={setOriginPort} 
+                                 placeholder={`Search or type port in ${originCountry}...`}
+                               />
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                       
+                       {/* Destination Block */}
+                       <div className="border-l-4 border-blue-900 pl-4 py-2 mt-2 border-t border-slate-200 pt-4">
+                         <h4 className="font-bold text-blue-950 mb-3">Destination (Delivery Location)</h4>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Destination Country *</label>
+                             <select value={destCountry} onChange={(e) => {
+                                 setDestCountry(e.target.value);
+                                 setDestPort('');
+                               }} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                               <option value="" disabled>Select Country</option>
+                               {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                             </select>
+                           </div>
+                           
+                           {destCountry && (
+                             <div className="animate-fade-in-up">
+                               <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Destination Port Name *</label>
+                               <SmartPortAutocomplete 
+                                 country={destCountry} 
+                                 value={destPort} 
+                                 onChange={setDestPort} 
+                                 placeholder={`Search or type port in ${destCountry}...`}
+                               />
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </>
+                  )}
+
+                  {/* Domestic Specific Fields (Point A to Point B) */}
+                  {serviceType === 'Domestic' && (
+                     <>
+                       <div className="border-l-4 border-orange-500 pl-4 py-2">
+                         <h4 className="font-bold text-blue-950 mb-3">Origin (Pickup Location)</h4>
+                         <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Pickup State *</label>
+                         <select value={pickupState} onChange={(e) => setPickupState(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                           <option value="" disabled>Select State</option>
+                           {states.length > 0 ? states.map(s => <option key={s} value={s}>{s}</option>) : <option disabled>Loading states...</option>}
+                         </select>
+                       </div>
+                       
+                       <div className="border-l-4 border-blue-900 pl-4 py-2 mt-2 border-t border-slate-200 pt-4">
+                         <h4 className="font-bold text-blue-950 mb-3">Destination (Delivery Location)</h4>
+                         <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Delivery State *</label>
+                         <select value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                           <option value="" disabled>Select State</option>
+                           {states.length > 0 ? states.map(s => <option key={s} value={s}>{s}</option>) : <option disabled>Loading states...</option>}
+                         </select>
+                       </div>
+                     </>
+                  )}
+                </div>
+              )}
+
+              {/* DYNAMIC FIELDS: Mentorship */}
+              {serviceType === 'Mentorship' && (
+                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-inner">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Mentorship Program Focus *</label>
+                  <select value={mentorshipType} onChange={(e) => setMentorshipType(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" required>
+                    <option value="" disabled>Select Focus Area</option>
+                    <option value="International Sales">International Sales</option>
+                    <option value="Domestic Sales">Domestic Sales</option>
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Message</label>
+                <label className="block text-xs md:text-sm font-semibold text-slate-700 mb-2">Detailed Message *</label>
                 <textarea rows="5" name="message" value={formData.message} onChange={handleChange} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm md:text-base" placeholder="Tell us about your logistics needs..." required></textarea>
               </div>
+              
               <button 
                 type="submit" 
                 disabled={status === 'submitting'}
@@ -692,7 +1121,7 @@ export default function App() {
       }
       document.title = "VDNEX IMPEX & SERVICES";
     } catch(err) {
-      console.error("Favicon process bypassed", err);
+      // Bypassed
     }
   }, []);
 
@@ -725,6 +1154,12 @@ export default function App() {
         .ticker-track:hover {
           animation-play-state: paused;
         }
+        
+        /* CUSTOM SCROLLBAR FOR DROPDOWN */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px;}
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px;}
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
       {/* --- LIVE DATA TICKER (MOVING FRAME) --- */}
@@ -810,7 +1245,7 @@ export default function App() {
             ))}
           </div>
 
-          <button className="text-left py-2 border-b border-slate-100" onClick={() => navigateTo('career')}>Career</button>
+          <button className="text-left py-2 border-b border-slate-100" onClick={() => navigateTo('career')} >Career</button>
           <button className="text-left py-2 border-b border-slate-100" onClick={() => navigateTo('contact')}>Contact</button>
           <button onClick={() => navigateTo('contact')} className="bg-orange-500 text-white px-6 py-4 rounded-md mt-6 w-full uppercase tracking-wide shadow-lg">Get a Quote</button>
         </div>
