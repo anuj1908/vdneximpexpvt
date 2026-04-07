@@ -1346,7 +1346,7 @@ export default function App() {
          {/* Copyright Bar */}
          <div className="max-w-7xl mx-auto border-t border-slate-800 pt-6 md:pt-8 flex flex-col md:flex-row justify-between items-center text-xs md:text-sm text-center md:text-left gap-4 md:gap-0">
             <p>Copyright &copy; {new Date().getFullYear()} VDNEX Impex & Services Pvt Ltd. All Rights Reserved.</p>
-            <p className="flex items-center justify-center gap-1">Website designed with <span className="text-orange-500 font-bold">Logistics UI</span></p>
+            <p className="flex items-center justify-center gap-1">Website designed with <span className="text-orange-500 font-bold">AD Web</span></p>
          </div>
       </footer>
     </div>
