@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 // --- ASSETS & DATA ---
-const LOGO_SRC = "/logo.png"; 
+const LOGO_SRC = "/logo.jpeg"; 
 
 const services = [
   { id: 1, title: 'Air Freight', icon: Plane, desc: 'Fast and reliable global air freight services ensuring your cargo arrives on time.', img: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=70&w=600', details: 'Air freight is the fastest and most reliable way to ship goods globally. At VDNEX, we partner with major airlines to provide priority, standard, and deferred air freight solutions. Whether you are shipping perishable goods, high-value electronics, or urgent documents, our dedicated air freight team ensures swift customs clearance and door-to-door delivery.' },
@@ -404,7 +404,7 @@ const AboutView = ({ navigateTo }) => (
       <div className="flex flex-col lg:flex-row gap-12 md:gap-16 items-center animate-on-scroll">
         <div className="lg:w-1/2 relative group">
           <div className="absolute inset-0 bg-orange-500 rounded-2xl transform translate-x-4 translate-y-4 group-hover:translate-x-2 group-hover:translate-y-2 transition-transform duration-500"></div>
-          <img src="https://images.unsplash.com/photo-1586528116311-ad8ed7c50adf?auto=format&fit=crop&q=80&w=1000" alt="VDNEX Operations" loading="lazy" className="relative rounded-2xl shadow-xl w-full h-[400px] md:h-[500px] object-cover z-10 group-hover:-translate-y-2 transition-transform duration-500"/>
+          <img src="https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&q=80&w=1000" alt="VDNEX Operations" loading="lazy" className="relative rounded-2xl shadow-xl w-full h-[400px] md:h-[500px] object-cover z-10 group-hover:-translate-y-2 transition-transform duration-500"/>
           
           {/* Floating Badge */}
           <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl shadow-2xl z-20 animate-fade-in-up delay-300 hidden md:block border-b-4 border-blue-950">
